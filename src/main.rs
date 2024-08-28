@@ -49,24 +49,26 @@ fn main() -> io::Result<()> {
         let result = panic::catch_unwind(move || {
             let cmd_result = execute_cmd(&mut ctx_wrapper);
             match cmd_result {
-                Ok(payload) => {
+                Ok(_payload) => {
                     #[cfg(debug_assertions)]
-                    println!("Commmand execution result {:?}", payload);
+                    println!("Commmand execution result {:?}", _payload);
                 },
                 Err(e) => {
+                    let error = format!("error: {}\n", e);
+                    io::stderr().write_all(&error.into_bytes()).expect("Couldn't write to stderr.");
                     #[cfg(debug_assertions)]
                     println!("Command execution error {:?}", e);
                 },
             }
         });
         match result {
-            Ok(payload) => {
+            Ok(_payload) => {
                 #[cfg(debug_assertions)]
-                println!("Unwinded result {:?}", payload);
+                println!("Unwinded result {:?}", _payload);
             },
-            Err(e) => {
+            Err(_e) => {
                 #[cfg(debug_assertions)]
-                println!("Unwinded error {:?}", e);
+                println!("Unwinded error {:?}", _e);
             },
         }
     }
@@ -96,6 +98,7 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
         .enumerate()
         .map( |(i,c)| {
             let selection = (i, selector.select(&c), c, selector.clone());
+            #[cfg(debug_assertions)]
             println!("{selection:?}");
             selection
         })
@@ -104,12 +107,16 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                 Err(e) => Err(e),
                 Ok(mut acc) => {
                     if acc.len() == 0 {
-                        acc.push(c.to_string());
+                        if Some(c) != selector.char_stack.last() || !selector.chars_selected.contains(c) { 
+                            acc.push(c.to_string())
+                        }
                     } else {
                         match selection {
                             Ok(true) => {
                                 if let Some(last) = acc.last_mut() {
-                                    last.push(*c);
+                                    if (Some(c) != selector.char_stack.last() && selector.active == true) || !selector.chars_selected.contains(c) { 
+                                        last.push(*c);
+                                    }
                                 } else {
                                     // if selection is Ok(true) and there is no accumulated values yet 
                                     // then the Selector was initialized with an active = true value.
@@ -117,7 +124,9 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                                 }
                             },
                             Ok(false) => {
-                                acc.push(c.to_string())
+                                if Some(c) != selector.char_stack.last() || !selector.chars_selected.contains(c) { 
+                                    acc.push(c.to_string())
+                                }
                             },
                             Err(e) => {
                                 return Err(e);
@@ -126,10 +135,9 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                     }
                     // if it is the last element and selector.active is still true
                     // (or there are still characters in the stack to be matched)
-                    // then return an unmatched char selection error.
-                    println!("enumerator {} with length {}", i, input_selection.len());
+                    // then return an mismatched char selection error.
                     if i == input_selection.len() - 1 && selector.char_stack.len() > 0 {
-                        Err(Error::new(ErrorKind::Other.into(), "unmatched quotes."))
+                        Err(Error::new(ErrorKind::Other.into(), "mismatched quotes"))
                     } else {
                         Ok(acc)
                     }
@@ -230,8 +238,8 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                                     path_name.to_string()
                                 },
                                 None => { 
-                                    let error = format!("{}\n", ErrorKind::NotFound);
-                                    handle_err.write_all(&error.into_bytes())?;
+                                    let _error = format!("{}\n", ErrorKind::NotFound);
+                                    handle_err.write_all(&_error.into_bytes())?;
                                     ctx.current_directory.clone()
                                     
                                 }
@@ -272,9 +280,9 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                 }
             },
             Err(ref e) => {
-                let error = format!("{}\n",e);
-                handle_err.write_all(&error.into_bytes())?;
-                
+                let _error = format!("{}\n",e);
+                #[cfg(debug_assertions)]
+                handle_err.write_all(&_error.into_bytes())?;
             }
         }
         // Return the result of execution to the caller.

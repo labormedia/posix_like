@@ -28,7 +28,7 @@ impl Selector {
                     }
                 } else {
                     self.catch_error = true;
-                    Err(Error::new(ErrorKind::Other.into(), "unmatched quotes."))
+                    Err(Error::new(ErrorKind::Other.into(), "mismatched quotes"))
                 } 
             },
             false => {
