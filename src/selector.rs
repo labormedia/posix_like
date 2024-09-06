@@ -19,7 +19,7 @@ impl Selector {
                if let Some(c_stacked) = self.char_stack.last() { 
                     if c == c_stacked {
                         self.char_stack.pop();
-                        if self.char_stack.last() == None {
+                        if self.char_stack.last().is_none() {
                             self.active = false;
                         }
                         Ok(true)
@@ -28,11 +28,11 @@ impl Selector {
                     }
                 } else {
                     self.catch_error = true;
-                    Err(Error::new(ErrorKind::Other.into(), "mismatched quotes"))
+                    Err(Error::new(ErrorKind::Other, "mismatched quotes"))
                 } 
             },
             false => {
-                if self.chars_selected.contains(&c) {
+                if self.chars_selected.contains(c) {
                     self.char_stack.push(*c);
                     self.active = true
                 }

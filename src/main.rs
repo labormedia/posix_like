@@ -97,16 +97,16 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
         .iter()
         .enumerate()
         .map( |(i,c)| {
-            let selection = (i, selector.select(&c), c, selector.clone());
+            let selection = (i, selector.select(c), c, selector.clone());
             #[cfg(debug_assertions)]
             println!("{selection:?}");
             selection
         })
-        .fold( Ok(Vec::<String>::new()), |result_acc: io::Result<Vec<String>>, (i, selection, c, selector)| {
+        .fold( Ok(Vec::<String>::new()), |result_acc: io::Result<Vec<String>>, (i, selection, c, selector): (usize, io::Result<bool>, &char, Selector)| {
             match result_acc {
                 Err(e) => Err(e),
                 Ok(mut acc) => {
-                    if acc.len() == 0 {
+                    if acc.is_empty() {
                         if Some(c) != selector.char_stack.last() || !selector.chars_selected.contains(c) { 
                             acc.push(c.to_string())
                         }
@@ -114,13 +114,13 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                         match selection {
                             Ok(true) => {
                                 if let Some(last) = acc.last_mut() {
-                                    if (Some(c) != selector.char_stack.last() && selector.active == true) || !selector.chars_selected.contains(c) { 
+                                    if (Some(c) != selector.char_stack.last() && selector.active ) || !selector.chars_selected.contains(c) { 
                                         last.push(*c);
                                     }
                                 } else {
                                     // if selection is Ok(true) and there is no accumulated values yet 
                                     // then the Selector was initialized with an active = true value.
-                                    return Err(Error::new(ErrorKind::Other.into(), "Invalid Selector initialization."));
+                                    return Err(Error::new(ErrorKind::Other, "Invalid Selector initialization."));
                                 }
                             },
                             Ok(false) => {
@@ -136,8 +136,8 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
                     // if it is the last element and selector.active is still true
                     // (or there are still characters in the stack to be matched)
                     // then return an mismatched char selection error.
-                    if i == input_selection.len() - 1 && selector.char_stack.len() > 0 {
-                        Err(Error::new(ErrorKind::Other.into(), "mismatched quotes"))
+                    if i == input_selection.len() - 1 && !selector.char_stack.is_empty() {
+                        Err(Error::new(ErrorKind::Other, "mismatched quotes"))
                     } else {
                         Ok(acc)
                     }
@@ -146,7 +146,7 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
         })?;
     // Removes any empty of single spaces that could have remained from the non destructive selection.
     selector_binding.retain( |s| {
-            s != "" &&  s != " "
+            !s.is_empty() &&  s != " "
         });
     // Trims spaces from the remainding selections.
     let parsed_input: Vec<&str> = selector_binding
@@ -160,12 +160,12 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
         [cmd, args @ ..] => { 
             if cmd.len() > ctx.character_limit {
                 // check size limits
-                let error  = format!("{}", Error::new(ErrorKind::Other.into(), "character size limit exceeded"));
+                let error  = format!("{}", Error::new(ErrorKind::Other, "character size limit exceeded"));
                 handle_err.write_all(&error.into_bytes())?;
                 (None, None)
-            } else if args.len() > 0 {
+            } else if !args.is_empty() {
                 if args.len() > ctx.argument_limit {
-                    let error  = format!("{}", Error::new(ErrorKind::Other.into(), "arguments size limit exceeded"));
+                    let error  = format!("{}", Error::new(ErrorKind::Other, "arguments size limit exceeded"));
                     handle_err.write_all(&error.into_bytes())?;
                     (None, None)
                 } else {
@@ -180,7 +180,7 @@ fn execute_cmd(ctx: &mut AssertUnwindSafe<&mut Ctx>) -> io::Result<Output> {
     #[cfg(debug_assertions)]
     println!("Parsed_input {:?}", parsed_input);
     // TODO implement print errors, cd, exit (with exit code if non 0), exit when EOF on stdout, 1000 characters limit length and error, 
-    if cmd_option == None {
+    if cmd_option.is_none() {
         // do no command
         // Return a result of no execution.
         Ok(
